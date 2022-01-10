@@ -18,7 +18,7 @@ plot_it <- function(res,bins) {
   plot_grid(intercept,xind, labels = "AUTO")
 }
 
-compute <- function(trials) {
+compute <- function(trials,cores) {
   # Setting options for clustermq (can also be done in .Rprofile)
   options(
     clustermq.scheduler = "slurm",
@@ -31,7 +31,7 @@ compute <- function(trials) {
   library(palmerpenguins)
   
   # Register parallel backend to foreach
-  register_dopar_cmq(n_jobs=2, memory=1024, log_worker=TRUE, chunk_size=trials/10)
+  register_dopar_cmq(n_jobs=cores, memory=1024, log_worker=TRUE, chunk_size=trials/10)
   
   # Our dataset 
   x<-penguins[c(4,1)]
@@ -82,35 +82,42 @@ $(document).ready(function() {
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-    tags$head(tags$script(HTML(JS.logify))),
-    tags$head(tags$script(HTML(JS.onload))),
-    
-    # Application title
-    titlePanel("Penguins"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-      sidebarPanel(
+  tags$head(tags$script(HTML(JS.logify))),
+  tags$head(tags$script(HTML(JS.onload))),
+  
+  # Application title
+  titlePanel("Penguins"),
+  
+  # Sidebar with a slider input for number of bins
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput(
+        "trials",
+        "Number of Trials:",
+        min = 2,
+        max = 6,
+        value = 2,
+        step = 0.5
+      ),
       
-            sliderInput("trials",
-                        "Number of Trials:",
-                        min = 2,
-                        max = 6,
-                        value = 2, 
-                        step=0.5
-                        ),
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 10,
-                        max = 200,
-                        value = 50)
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
-    )
+      sliderInput(
+        "bins",
+        "Number of bins:",
+        min = 10,
+        max = 200,
+        value = 50
+      ),
+      sliderInput(
+        "cores",
+        "Numbers of core:",
+        min = 1,
+        max = 200,
+        value = 2
+      )
+    ),
+    # Show a plot of the generated distribution
+    mainPanel(plotOutput("distPlot"))
+  )
 )
 
 
@@ -118,18 +125,30 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
-    output$distPlot <- renderPlot({
-      isolate(observeEvent(input$trials, {
-        cat("Running", 10^input$trials, "trials\n")
-        res <- compute(10^input$trials)
-        plot_it(res,input$bins)
-      }))
-      isolate(observeEvent(input$bins, {
-        cat("Running", input$bins, "bins\n")
-        plot_it(res,input$bins)
-      }))
-      
-    })
+  # Initialize with dummy value
+  res <- 1
+  
+  # res is a reactiveValue so that it can be used in observeEvent() 
+  # and still be used in output$distPlot
+  rv <- reactiveValues(res=res)
+  
+  # Various events 
+  observeEvent(input$trials, {
+    cat("Running", 10 ^ input$trials, "trials\n")
+    rv$res <- compute(10 ^ input$trials,input$cores)
+  })
+  observeEvent(input$bins, {
+    cat("Setting", input$bins, "bins\n")
+  })
+  observeEvent(input$cores, {
+    cat("Setting", input$coress, "cores\n")
+    rv$res <- compute(10 ^ input$trials,input$cores)
+  })
+  
+  # Plot the histogram
+  output$distPlot <- renderPlot({
+    plot_it(rv$res, input$bins)
+  })
 }
 
 # Run the application 
