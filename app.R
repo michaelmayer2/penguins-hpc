@@ -7,23 +7,30 @@
 #    http://shiny.rstudio.com/
 #
 
-plot_it <- function(res,bins) {
+
+library(shiny)
+
+
+plot_it <- function(res, bins) {
+  # Plot routine
   library(cowplot)
   library(ggplot2)
   
-  intercept <- ggplot(as.data.frame(res), aes(x=`(Intercept)`)) + geom_histogram(bins=bins)
+  intercept <-
+    ggplot(as.data.frame(res), aes(x = `(Intercept)`)) + geom_histogram(bins =
+                                                                          bins)
   
-  xind <- ggplot(as.data.frame(res), aes(x=`x[ind, 1]`)) + geom_histogram(bins=bins)
+  xind <-
+    ggplot(as.data.frame(res), aes(x = `x[ind, 1]`)) + geom_histogram(bins =
+                                                                        bins)
   
-  plot_grid(intercept,xind, labels = "AUTO")
+  plot_grid(intercept, xind, labels = "AUTO")
 }
 
-compute <- function(trials,cores) {
+compute <- function(trials, cores) {
   # Setting options for clustermq (can also be done in .Rprofile)
-  options(
-    clustermq.scheduler = "slurm",
-    clustermq.template = "slurm.tmpl" # if using your own template
-  )
+  options(clustermq.scheduler = "slurm",
+          clustermq.template = "slurm.tmpl")
   
   # Loading libraries
   library(clustermq)
@@ -31,23 +38,27 @@ compute <- function(trials,cores) {
   library(palmerpenguins)
   
   # Register parallel backend to foreach
-  register_dopar_cmq(n_jobs=cores, memory=1024, log_worker=TRUE, chunk_size=trials/10)
+  register_dopar_cmq(
+    n_jobs = cores,
+    memory = 1024,
+    log_worker = TRUE,
+    chunk_size = trials / 5 / cores
+  )
   
-  # Our dataset 
-  x<-penguins[c(4,1)]
+  # Our dataset
+  x <- penguins[c(4, 1)]
   
   # Number of trials to simulate
   trials <- trials
   
   # Main loop
-  foreach(i=1:trials,.combine=rbind) %dopar% {
-    ind <- sample(344, 344, replace=TRUE)
-    result1 <- glm(x[ind,2]~x[ind,1], family=binomial(logit))
+  foreach(i = 1:trials, .combine = rbind) %dopar% {
+    ind <- sample(344, 344, replace = TRUE)
+    result1 <-
+      glm(x[ind, 2] ~ x[ind, 1], family = binomial(logit))
     coefficients(result1)
   }
 }
-
-library(shiny)
 
 # logify from https://stackoverflow.com/questions/30502870/shiny-slider-on-logarithmic-scale
 # logifySlider javascript function
@@ -120,29 +131,26 @@ ui <- fluidPage(
   )
 )
 
-
-
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-  
   # Initialize with dummy value
   res <- 1
   
-  # res is a reactiveValue so that it can be used in observeEvent() 
+  # res is a reactiveValue so that it can be used in observeEvent()
   # and still be used in output$distPlot
-  rv <- reactiveValues(res=res)
+  rv <- reactiveValues(res = res)
   
-  # Various events 
+  # Various events
   observeEvent(input$trials, {
     cat("Running", 10 ^ input$trials, "trials\n")
-    rv$res <- compute(10 ^ input$trials,input$cores)
+    rv$res <- compute(10 ^ input$trials, input$cores)
   })
   observeEvent(input$bins, {
     cat("Setting", input$bins, "bins\n")
   })
   observeEvent(input$cores, {
     cat("Setting", input$coress, "cores\n")
-    rv$res <- compute(10 ^ input$trials,input$cores)
+    rv$res <- compute(10 ^ input$trials, input$cores)
   })
   
   # Plot the histogram
@@ -151,5 +159,5 @@ server <- function(input, output) {
   })
 }
 
-# Run the application 
+# Run the application
 shinyApp(ui = ui, server = server)
