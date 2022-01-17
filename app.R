@@ -29,8 +29,15 @@ plot_it <- function(res, bins) {
 
 compute <- function(trials, cores) {
   # Setting options for clustermq (can also be done in .Rprofile)
-  options(clustermq.scheduler = "slurm",
-          clustermq.template = "slurm.tmpl")
+  #options(clustermq.scheduler = "slurm",
+  #        clustermq.template = "slurm.tmpl")
+  
+  options(
+    clustermq.scheduler = "ssh",
+    clustermq.template = "ssh.tmpl",
+    clustermq.ssh.host = "mm@18.202.222.234", # use your user and host, obviously
+    clustermq.ssh.log = "~/cmq_ssh.log" # log for easier debugging
+  )
   
   # Loading libraries
   library(clustermq)
@@ -116,14 +123,14 @@ ui <- fluidPage(
         "Number of bins:",
         min = 10,
         max = 200,
-        value = 50
+        value = 100
       ),
       sliderInput(
         "cores",
         "Numbers of core:",
         min = 1,
         max = 200,
-        value = 2
+        value = 1
       )
     ),
     # Show a plot of the generated distribution
@@ -149,7 +156,7 @@ server <- function(input, output) {
     cat("Setting", input$bins, "bins\n")
   })
   observeEvent(input$cores, {
-    cat("Setting", input$coress, "cores\n")
+    cat("Setting", input$cores, "cores\n")
     rv$res <- compute(10 ^ input$trials, input$cores)
   })
   
