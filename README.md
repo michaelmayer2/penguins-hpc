@@ -33,7 +33,7 @@ Please note that the below always refers to SLURM - any other clustermq supporte
 
 * The `zeromq` package (part of the operating system) must be installed on both the Connect server as well on the compute nodes
 * The RStudio Connect Server needs to be a submit node, i.e. it needs to share the SLURM config, binaries and the munge.key
-* The user running the app on rstudio-connect and on the Compute nodes ideally should be the same. Most likely this will be a service account. 
+* The user running the app on RStudio Connect and on the Compute nodes must be the same. Most likely this will be a service account (e.g rstudio-connect) but also can be a real user (if RunasUser is being used inthe app). Since Submit Node and Compute Node share the same Authentication Provider, Users exist both on the Submit Nodes as well as on the Compute Nodes
 * The SLURM configuration must be done within `app.R` (e.g. `clustermq.scheduler` and (optionally `clustermq.template` if the default template is good enough) 
 * R versions on Connect and the HPC should match
 * Updates to the clustermq template (`slurm.tmpl` in the case of SLURM) are needed 
@@ -46,17 +46,22 @@ Please note that the below always refers to SLURM - any other clustermq supporte
 
 * The `zeromq` package (part of the operating system) must be installed on both the Connect server as well on the submit & compute nodes of the HPC
 * The RStudio Connect Server needs to store the private ssh key of the user running the app while the public ssh key is stored on the HPC in the user's home. ssh keys must be passwordless
-* The user running the app on rstudio-connect and on the HPC ideally should be the same. Most likely this will be a service account. 
-* The SSH configuration must be done within `app.R` (e.g. `clustermq.scheduler` and (optionally `clustermq.template` if the default template is good enough)
+* The user running the app on RStudio Connect and on the HPC for simplicity reasons should be the same. Most likely this will be a service account. 
+* In principle it is also possible to connect the technical account on RStudio Connect to a different user on the HPC via the user of passwordless ssh keys.
+* ssh client needs to be installed on the Connect infrastructure
+* The ssh configuration must be done within `app.R` (e.g. `clustermq.scheduler` and (optionally `clustermq.template` if the default template is good enough)
 * The SLURM configuration can be done in `.Rprofile` 
 * R versions on Connect and the HPC should match
 * Updates to the clustermq templates (`slurm.tmpl` in the case of SLURM and `ssh.tmpl`) are needed 
    * if app uses `renv` and the compute functions use more than just the recommended packages. In this case it is advisable to deploy a copy of `renv.lock` in an application specific folder in the user's home-directory and configure the respective folder and activation of the environment within the template  
    * if HPC cluster uses software environment modules
+   * ssh template needs to be updated anyway to configure the use of the private ssh key
 
 ### Comparison of both options
 
 |    | Option 1: Connect as HPC submit node |     Option 2: Connect separate from HPC          |
 |----------|:-------------|:------|
-| Pro |  <ul><li>more direct integration</li><li>faster start of the computation</li><li>no need for ssh keys</li></ul> |  <ul><li>No need to extend the HPC to RStudio Connect - keep both infrastructures separate</li></ul> |
-| Contra | <ul><li>Extension of HPC into Connect environment creates additional complexity within Connect</li></ul>| <ul><li>Configuration of two clustermq interfaces: `ssh.tmpl` and `slurm.tmpl`</li><li>additional complexity when troubleshooting</li><li>startup time of computation longer</li></ul> |
+| Pro |  <ul><li>more direct integration</li><li>faster start of the computation</li><li>no need for ssh keys</li></ul> |  <ul><li>No need to extend the HPC to RStudio Connect - keep both infrastructures separate</li><li>ssh client needs to be installed in Connect</li></ul> |
+| Contra | <ul><li>Extension of HPC into Connect environment creates additional complexity within Connect</li></ul>| <ul><li>Configuration of two clustermq interfaces: `ssh.tmpl` and `slurm.tmpl`</li><li>additional complexity when troubleshooting</li><li>startup time of computation longer (ssh connection initialization)</li></ul> |
+
+Both options work equally well and the decision which option to choose really depends on the local setup and preferences. The larger number of Contra for option 2 should not imply that this option is more problematic. Option 2 is more complex but many HPC clusters are closed infrastructures managed by a dedicated team of admins. Allowing a third party app like Connect to be installed on a submit node can cause more problems than benefit. 
