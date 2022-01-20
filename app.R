@@ -27,44 +27,64 @@ plot_it <- function(res, bins) {
   plot_grid(intercept, xind, labels = "AUTO")
 }
 
-compute <- function(trials, cores) {
-  # Setting options for clustermq (can also be done in .Rprofile)
-  #options(clustermq.scheduler = "slurm",
-  #        clustermq.template = "slurm.tmpl")
+compute <- function(trials, cores, session) {
+  #sink("env.txt")
+  #sink()
+  #cat(print(as.list(session)))
+  #cat(print(as.list(session)))
+  print("success")
+
+  cmq_method <- config::get("cmq_method")
   
-  options(
-    clustermq.scheduler = "ssh",
-    clustermq.template = "ssh.tmpl",
-    clustermq.ssh.host = "mm@18.202.222.234", # use your user and host, obviously
-    clustermq.ssh.log = "~/cmq_ssh.log" # log for easier debugging
-  )
+  if (cmq_method == "slurm") {
+    options(clustermq.scheduler = "slurm",
+            clustermq.template = "./slurm.tmpl"
+            )
+  }
+  if (cmq_method == "ssh") {
+    options(clustermq.scheduler = "ssh",
+            clustermq.template = "./ssh.tmpl",
+            clustermq.ssh.host = config::get("cmq_remote_host") # use your user and host, obviously
+            #clustermq.ssh.log = "~/cmq_ssh.log" # log for easier debugging
+            )
+  }
   
   # Loading libraries
   library(clustermq)
   library(foreach)
   library(palmerpenguins)
+  library(progressr)
   
   # Register parallel backend to foreach
   register_dopar_cmq(
     n_jobs = cores,
     memory = 1024,
-    log_worker = TRUE,
-    chunk_size = trials / 5 / cores
+    log_worker = FALSE,
+    export = list(session=session) #,
+    #chunk_size = trials / 5 / cores
   )
   
   # Our dataset
-  x <- penguins[c(4, 1)]
+  x <- as.data.frame(penguins[c(4, 1)])
   
   # Number of trials to simulate
   trials <- trials
-  
   # Main loop
-  foreach(i = 1:trials, .combine = rbind) %dopar% {
-    ind <- sample(344, 344, replace = TRUE)
-    result1 <-
-      glm(x[ind, 2] ~ x[ind, 1], family = binomial(logit))
-    coefficients(result1)
-  }
+  withProgressShiny(
+    detail = 'This may take a while...',
+    message = 'Calculation in progress',
+    value = NULL,
+    foreach(
+        i = 1:trials,
+        .combine = rbind,
+        .packages = c("shiny")
+        ) %dopar% {
+        ind <- sample(344, 344, replace = TRUE)
+        result1 <-
+          glm(x[ind, 2] ~ x[ind, 1], family = binomial(logit))
+        coefficients(result1)
+        }
+  )
 }
 
 # logify from https://stackoverflow.com/questions/30502870/shiny-slider-on-logarithmic-scale
@@ -139,7 +159,7 @@ ui <- fluidPage(
 )
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
+server <- function(input, output, session) {
   # Initialize with dummy value
   res <- 1
   
@@ -150,14 +170,14 @@ server <- function(input, output) {
   # Various events
   observeEvent(input$trials, {
     cat("Running", 10 ^ input$trials, "trials\n")
-    rv$res <- compute(10 ^ input$trials, input$cores)
+    rv$res <- compute(10 ^ input$trials, input$cores, session)
   })
   observeEvent(input$bins, {
     cat("Setting", input$bins, "bins\n")
   })
   observeEvent(input$cores, {
     cat("Setting", input$cores, "cores\n")
-    rv$res <- compute(10 ^ input$trials, input$cores)
+    rv$res <- compute(10 ^ input$trials, input$cores, session)
   })
   
   # Plot the histogram
