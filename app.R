@@ -28,17 +28,14 @@ plot_it <- function(res, bins) {
 }
 
 compute <- function(trials, cores, session) {
-  #sink("env.txt")
-  #sink()
-  #cat(print(as.list(session)))
-  #cat(print(as.list(session)))
   print("success")
 
   cmq_method <- config::get("cmq_method")
   
   if (cmq_method == "slurm") {
     options(clustermq.scheduler = "slurm",
-            clustermq.template = "./slurm.tmpl"
+            clustermq.template = "./slurm.tmpl",
+            clustermq.data.warning = 100
             )
   }
   if (cmq_method == "ssh") {
